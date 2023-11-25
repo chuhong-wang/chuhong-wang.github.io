@@ -23,7 +23,7 @@ description: >- # this means to ignore newlines until "baseurl:"
   My research is primarily focused on atomistic simulation accelerated by machine learning models, 
   as well as data-driven materials discovery. 
 
-baseurl: "chuhong-wang"
+baseurl: "chuhong-wang.github.io"
 url: ""
 twitter_username: chuhong_wang
 github_username: chuhong-wang
