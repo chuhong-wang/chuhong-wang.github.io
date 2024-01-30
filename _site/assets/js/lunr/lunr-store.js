@@ -1,7 +1,13 @@
 var store = [{
         "title": "Welcome to Jekyll!",
-        "excerpt":"You’ll find this post in your _posts directory. Go ahead and edit it and re-build the site to see your changes. You can rebuild the site in many different ways, but the most common way is to run jekyll serve, which launches a web server and auto-regenerates your site when...","categories": ["blog"],
-        "tags": ["Jekyll","update"],
+        "excerpt":"University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 1 - Flocking Boid Simulation In case you’re have the same question in mind … Q: From brute force to pre-processing boids with uniform grid, what is the advantage of sorting by grid cell index strategy? It didn’t come nature...","categories": ["blog"],
+        "tags": ["coding","cuda"],
         "url": "/blog/welcome-to-jekyll/",
+        "teaser": null
+      },{
+        "title": "CUDA flocking parallelization",
+        "excerpt":"UPenn CIS 565: GPU Programming and Architecture Project 1 - Flocking Boid Simulation In case you’re have the same question in mind … Q: From brute force to pre-processing boids with uniform grid, what is the advantage of sorting by grid cell index strategy? It didn’t come nature to me....","categories": ["blog"],
+        "tags": ["C++","cuda"],
+        "url": "/blog/CUDA-flocking/",
         "teaser": null
       }]

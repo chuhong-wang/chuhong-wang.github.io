@@ -1,6 +1,8 @@
 main:
   - title: "About"
     url: https://chuhong-wang.github.io/
+  - title: "Blog"
+    url: /posts/
   - title: "Publications"
     url: /publications/
   - title: "Curriculum Vitae"
