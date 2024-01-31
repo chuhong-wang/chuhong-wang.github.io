@@ -8,15 +8,21 @@ tags:
   - cuda
 ---
 
-UPenn CIS 565: GPU Programming and Architecture
-[Project 1 - Flocking](https://github.com/CIS565-Fall-2022/Project1-CUDA-Flocking/blob/main/INSTRUCTION.md)
+Here're my notes on [Project 1 - Flocking](https://github.com/CIS565-Fall-2022/Project1-CUDA-Flocking/blob/main/INSTRUCTION.md) as part of UPenn CIS 565: GPU Programming and Architecture. 
 
-### Boid Simulation 
+### @ Brief
+The basic idea of boid flocking is to apply certain rules on the change of velocity of each boid based on the positions and velocities of its neighbors. Implementing on GPU differs from CPU. I'll explain the algorithm for CUDA parallelization I learned from this course and the reasons behind using a different algorithm than CPU version. 
 
-#### In case you're have the same question in mind ...
-Q:  From brute force to pre-processing boids with uniform grid, what is the advantage of **sorting by grid cell index** strategy? It didn't come nature to me. 
+#### - Start with CPU
+Implementing on CPU is straight-forward, from brute-force by nested for loop along three axes, to a more work-efficient strategy: pre-processing the space into grid so that we only need to compute the boids in the relevant grid cells instead of checking all boids at every time step. Now when we move on to CUDA parallelization, the project introduce a new algorithm: sorting by grid cell index.   
 
-A:  In order to improve computing efficiency, dividing the space into **uniform grid** and pre-assigning a grid cell index to each boid is a common approach to reduce the number of neighbor checking. 
+#### - Move on to GPU 
+
+In case you're also wondering ...
+
+**Q:**  From brute force to pre-processing boids with uniform grid on GPU, what is the advantage of **sorting by grid cell index** strategy? It didn't occur to me. 
+
+**A:**  In order to improve computing efficiency, dividing the space into **uniform grid** and pre-assigning a grid cell index to each boid is a common approach to reduce the number of neighbor checking. 
 
 (For demonstration purpose, suppose there're `N` boids. The space is divided into `M` grid cells.)
 

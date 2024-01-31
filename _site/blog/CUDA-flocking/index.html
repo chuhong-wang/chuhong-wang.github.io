@@ -10,7 +10,7 @@
     <meta charset="utf-8">
 
 <!-- begin _includes/seo.html --><title>CUDA flocking parallelization - Chuhong Wang</title>
-<meta name="description" content="UPenn CIS 565: GPU Programming and Architecture Project 1 - Flocking">
+<meta name="description" content="Here’re my notes on Project 1 - Flocking as part of UPenn CIS 565: GPU Programming and Architecture.">
 
 
 
@@ -21,7 +21,7 @@
 <meta property="og:url" content="http://localhost:4000/blog/CUDA-flocking/">
 
 
-  <meta property="og:description" content="UPenn CIS 565: GPU Programming and Architecture Project 1 - Flocking">
+  <meta property="og:description" content="Here’re my notes on Project 1 - Flocking as part of UPenn CIS 565: GPU Programming and Architecture.">
 
 
 
@@ -143,7 +143,7 @@
 
   <article class="page h-entry" itemscope itemtype="https://schema.org/CreativeWork">
     <meta itemprop="headline" content="CUDA flocking parallelization">
-    <meta itemprop="description" content="UPenn CIS 565: GPU Programming and ArchitectureProject 1 - Flocking">
+    <meta itemprop="description" content="Here’re my notes on Project 1 - Flocking as part of UPenn CIS 565: GPU Programming and Architecture.">
     <meta itemprop="datePublished" content="2024-01-23T14:34:30-05:00">
     
 
@@ -168,7 +168,7 @@
       <span class="page__meta-readtime">
         <i class="far fa-clock" aria-hidden="true"></i>
         
-          1 minute read
+          2 minute read
         
       </span>
     
@@ -180,15 +180,21 @@
 
       <section class="page__content e-content" itemprop="text">
         
-        <p>UPenn CIS 565: GPU Programming and Architecture
-<a href="https://github.com/CIS565-Fall-2022/Project1-CUDA-Flocking/blob/main/INSTRUCTION.md">Project 1 - Flocking</a></p>
+        <p>Here’re my notes on <a href="https://github.com/CIS565-Fall-2022/Project1-CUDA-Flocking/blob/main/INSTRUCTION.md">Project 1 - Flocking</a> as part of UPenn CIS 565: GPU Programming and Architecture.</p>
 
-<h3 id="boid-simulation">Boid Simulation</h3>
+<h3 id="-brief">@ Brief</h3>
+<p>The basic idea of boid flocking is to apply certain rules on the change of velocity of each boid based on the positions and velocities of its neighbors. Implementing on GPU differs from CPU. I’ll explain the algorithm for CUDA parallelization I learned from this course and the reasons behind using a different algorithm than CPU version.</p>
 
-<h4 id="in-case-youre-have-the-same-question-in-mind-">In case you’re have the same question in mind …</h4>
-<p>Q:  From brute force to pre-processing boids with uniform grid, what is the advantage of <strong>sorting by grid cell index</strong> strategy? It didn’t come nature to me.</p>
+<h4 id="--start-with-cpu">- Start with CPU</h4>
+<p>Implementing on CPU is straight-forward, from brute-force by nested for loop along three axes, to a more work-efficient strategy: pre-processing the space into grid so that we only need to compute the boids in the relevant grid cells instead of checking all boids at every time step. Now when we move on to CUDA parallelization, the project introduce a new algorithm: sorting by grid cell index.</p>
 
-<p>A:  In order to improve computing efficiency, dividing the space into <strong>uniform grid</strong> and pre-assigning a grid cell index to each boid is a common approach to reduce the number of neighbor checking.</p>
+<h4 id="--move-on-to-gpu">- Move on to GPU</h4>
+
+<p>In case you’re also wondering …</p>
+
+<p><strong>Q:</strong>  From brute force to pre-processing boids with uniform grid on GPU, what is the advantage of <strong>sorting by grid cell index</strong> strategy? It didn’t occur to me.</p>
+
+<p><strong>A:</strong>  In order to improve computing efficiency, dividing the space into <strong>uniform grid</strong> and pre-assigning a grid cell index to each boid is a common approach to reduce the number of neighbor checking.</p>
 
 <p>(For demonstration purpose, suppose there’re <code class="language-plaintext highlighter-rouge">N</code> boids. The space is divided into <code class="language-plaintext highlighter-rouge">M</code> grid cells.)</p>
 
@@ -258,16 +264,6 @@
 
 
       
-  <nav class="pagination">
-    
-      <a href="/blog/welcome-to-jekyll/" class="pagination--pager" title="Welcome to Jekyll!
-">Previous</a>
-    
-    
-      <a href="#" class="pagination--pager disabled">Next</a>
-    
-  </nav>
-
     </div>
 
     
@@ -280,50 +276,9 @@
       <div class="grid__wrapper">
         
           
-
-
-
-<div class="grid__item">
-  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
-    
-    <h2 class="archive__item-title no_toc" itemprop="headline">
-      
-        <a href="/blog/welcome-to-jekyll/" rel="permalink">Welcome to Jekyll!
-</a>
-      
-    </h2>
-    
-
-  <p class="page__meta">
-    
-
-    
-
-    
-      
-      
-
-      <span class="page__meta-readtime">
-        <i class="far fa-clock" aria-hidden="true"></i>
-        
-          1 minute read
-        
-      </span>
-    
-  </p>
-
-
-    <p class="archive__item-excerpt" itemprop="description">University of Pennsylvania, CIS 565: GPU Programming and Architecture,
-Project 1 - Flocking
-
-</p>
-  </article>
-</div>
-
-        
+            
       </div>
     </div>
-  
   
 </div>
 
