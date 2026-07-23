@@ -65,18 +65,6 @@ Edit `app/publications/page.tsx`. Add an entry to the `publications` array:
 
 Add it at the top of the array so newest publications appear first.
 
-### Add or edit a project
-
-Edit `app/projects/page.tsx`. Add/modify entries in the `projects` array:
-
-```ts
-{
-  title: "Project Name",
-  description: "What does it do?",
-  link: "https://github.com/chuhong-wang/repo-name",
-},
-```
-
 ### Change navigation links
 
 Edit `components/nav.tsx`. The `navLinks` array controls page links, and `socialLinks` controls the social links below them.
@@ -90,7 +78,6 @@ Edit the `metadata` object in `app/layout.tsx`.
 ```
 app/                  # Pages (each folder = a route)
   page.tsx            # Home page (/)
-  projects/page.tsx   # /projects
   blog/page.tsx       # /blog
   blog/[slug]/page.tsx # Individual blog posts
   publications/page.tsx # /publications
