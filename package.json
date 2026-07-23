@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
   },
@@ -17,7 +17,9 @@
     "gray-matter": "^4.0.3",
     "next": "16.2.6",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "rehype-pretty-code": "^0.14.4",
+    "shiki": "^4.3.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -1,0 +1,128 @@
+export const metadata = {
+  title: "Building Reliable Callbacks for Async Subagents",
+  date: "2026-07-22",
+  description: "Hardening a subagent completion callback one failure mode at a time — from a naive callback to failure signals, watchdog timeouts, heartbeats, and idempotent retries.",
+}
+
+# Async subagents: from a basic callback to a reliable completion signal
+
+When an orchestrator delegates a long-running or multi-step task to a subagent, a synchronous request/response model doesn't fit: we don't want the orchestrator blocked while the subagent works. Plain `async`/`await` only helps when both live in the same process and the result comes back as a return value. It breaks down when the subagent is a remote container, a separate service, or when the result is produced by an event rather than a function return.
+
+The alternative is a **callback**: the subagent runs independently and notifies the orchestrator when it's done. It's a fine mechanism—but only becomes production-ready once you wrap it in layers of failure handling. In this post, I reflected on the development of the callback component in our agentic system and the design choices made for each failure mode.
+
+## 1. The basic callback
+
+Two roles: **Orchestrator** and **Subagent** demonstrate the flow here. The orchestrator exposes two endpoints, `GET /start` and `POST /callback`. `GET /start` tells the subagent to begin and returns immediately. `POST /callback` is used by the subagent to send its result back to the orchestrator when it's done. The subagent has one endpoint, `POST /execute`, which accepts the task, kicks off the work in the background, and returns `"accepted"` and an ID right away. When the work finishes, it POSTs back to the parent's `/callback`. This design makes the subagent's work non-blocking.
+
+**Where it breaks.** The design assumes the subagent will *eventually* call back. There's no error handling around the work—if it raises, the background task dies, no callback is ever sent, and the parent's delegated task sits in `running` status forever. So we add an explicit failure callback.
+
+## 2. Explicit failure callback
+
+To handle failures in the subagent's own work, we added a `try/except` block that catches exceptions. In this case, the subagent treats **failure as a signal to send**, rather than a silent death. Of course, in the real agentic system, exceptions are caught at multiple stages of the subagent's work, with explicit failure types and richer information returned to the orchestrator so it can ReAct accordingly.
+
+```python
+try:
+    result = await do_work(...)
+    await send_callback({"status": "completed", "result": result})
+except Exception as exc:
+    await send_callback({"status": "failed", "error": str(exc)})
+```
+
+The orchestrator can now distinguish between "finished and succeeded" and "finished and failed," instead of the subagent failing silently without passing the failure signal back to the orchestrator.
+
+**Where it breaks.** Stage 2 only helps when the subagent is *alive to catch its own error*. If the process is killed, the container is evicted, or the network partitions, no `except` block runs and no callback is sent. From the parent's perspective, that's identical to Stage 1's stuck task. We taught the subagent to speak more precisely—but the parent is still trusting it to speak at all.
+
+## 3. Parent-side timeout
+
+In Stage 2, we handled the scenario where the subagent's job fails programmatically. However, when the subagent crashes, hangs, or gets partitioned halfway through, the orchestrator will never receive a signal from it. The fix can't live in the subagent; a dead process runs no code. The parent needs **its own clock**. On every `/start`, it arms a watchdog:
+
+```python
+async def watchdog(task_id):
+    await asyncio.sleep(TASK_TIMEOUT_SECONDS)
+    if tasks[task_id]["status"] == "running":   # nothing terminal arrived
+        tasks[task_id].update(status="timed_out")
+```
+
+A crashed or hung subagent that sends nothing is now resolved to `timed_out` once the deadline passes. The parent stops waiting for a signal that never comes back. Two ideas here recur later:
+
+1. A `timed_out` task may actually have *succeeded* on the subagent; the parent simply stopped being willing to wait. So a late callback can still arrive after we've timed out, carrying a real result for a task we already gave up on.
+
+2. **First terminal state wins.** That's why the callback handler ignores any callback for a task that's no longer `running`:
+
+```python
+if task["status"] != "running":
+    return {"received": True, "ignored": True}   # late callback, drop it
+```
+
+Without this, a slow success arriving after a timeout would overwrite the decision the parent already acted on, and the state would flap. Pick the first terminal state and hold it.
+
+A simple timeout is **coarse**. The deadline has to cover the worst-case runtime, so it's necessarily generous - a subagent that dies one second into a sixty-second budget won't be noticed for another fifty-nine seconds. The crash can be captured, but slowly.
+
+## 4. Heartbeats
+
+When the subagent is handling a multi-step, compute-intensive task where the worst-case runtime spans a very large range, we want to know *fast* when the subagent stalls mid-task. **Detection time should depend on the heartbeat cadence, not on how long the task was supposed to take.** Those are two unrelated numbers, and Stage 3 accidentally tied them together. So the subagent pings the parent at a fixed interval, from a coroutine running alongside the actual work:
+
+```
+Subagent:  [work coroutine]  +  [heartbeat loop → POST /heartbeat every 2s]
+Parent:    liveness monitor watches the gap since the last beat
+```
+
+The parent declares the subagent dead when it misses a few beats in a row:
+
+```python
+if now - task["last_heartbeat"] > HEARTBEAT_INTERVAL * 2.5:
+    task.update(status="failed", error="missed heartbeats")
+```
+
+A stall is now caught in seconds, regardless of the task budget. Detection latency is decoupled from task duration—which was the whole goal. Three choices make it robust rather than twitchy:
+
+- **`2.5×`, not `1×`.** One missed beat can be a GC pause, a scheduling hiccup, or a dropped packet. Requiring a few consecutive misses trades a little latency for far fewer false "it's dead" calls. This multiplier is the sensitivity knob: smaller is faster but jumpier; larger is calmer but slower.
+- **Seed the first heartbeat at start time.** The task gets one full grace window to produce its first beat, so a slow cold start isn't mistaken for a subagent that was dead on arrival.
+
+## 5. Callback retry and idempotency
+
+So far, we've handled failures of the subagent task from both the subagent side and the orchestrator side. There is one more point of failure: the callback request itself can fail or arrive twice.
+
+Everything so far assumed the callback POST succeeds. But the callback is *just another network request*. It can fail even when the task succeeded, because the parent is briefly down, overloaded, or behind a flaky hop. A single dropped callback turns a healthy task into a spurious timeout: a maddening way to lose good work.
+
+The fix is two changes that only work as a pair.
+
+**Subagent side: retry with bounded backoff**
+
+```python
+for attempt in range(1, MAX_CALLBACK_ATTEMPTS + 1):
+    resp = await client.post(callback_url, json=payload)
+    if resp.status_code < 400:
+        return True                      # delivered
+    if resp.status_code < 500 and resp.status_code != 429:
+        return False                     # 4xx: malformed, will never succeed
+    await asyncio.sleep(backoff)         # 5xx / 429 / conn error: retry
+```
+
+- **Give the system more time between retries.** If the orchestrator is temporarily unavailable, don't keep sending requests immediately—wait a little longer after each failed attempt, up to a reasonable maximum. This gives a struggling service time to recover instead of adding even more load.
+- **Limit the number of retries.** If the parent is permanently unavailable, the subagent shouldn't keep trying forever. After a fixed number of attempts, the system should give up and record the failure.
+- **Only retry failures that might resolve themselves.** A temporary server error (`5xx`), rate limit (`429`), or connection failure might succeed if we try again later. A bad request (`400`/`422`), on the other hand, is unlikely to work without changing the request, so retrying it just wastes resources.
+
+**Parent side: an idempotent handler**
+
+Retries create duplicates. The parent may receive the same terminal callback twice—classically, the first delivery *did* land but its `200` response was lost, so the subagent retries a callback that already succeeded. The handler makes that harmless:
+
+```python
+if task["status"] != "running":
+    return {"received": True, "duplicate": True}   # already terminal → no-op, 200
+```
+
+- **First terminal state wins; later ones are no-ops**—the same rule from Stage 3, now doing double duty against duplicates.
+- **Return `200` on a duplicate, not an error.** From the sender's perspective, a duplicate *is* a success—the state it wanted is already recorded. An error would just tell the subagent to retry forever.
+
+Together, these give the standard distributed-systems result:
+
+> **at-least-once delivery + an idempotent receiver = effectively-once processing.**
+
+You can't cheaply make the network deliver exactly once. So you make delivering *twice* indistinguishable from delivering once, and stop worrying about how many times it actually happens.
+
+## Recap: where each failure mode is closed
+
+Each stage closes a different failure mode: task logic failures are handled with a `try/except` and an explicit failure callback; subagent crashes or hangs are detected by the parent's watchdog timeout; stalled tasks are detected more quickly through missed heartbeats, while an absolute deadline prevents a subagent from running indefinitely even if it keeps sending heartbeats; callback delivery failures are handled through retries with backoff; and duplicate callbacks are safely handled through idempotent terminal-state processing. The progression follows one core idea: **authority gradually shifts from the subagent to the parent.** By the end, the parent has its own clock to detect timeouts, its own liveness signal through heartbeats, and its own protection against unreliable delivery through idempotency. The callback is no longer the source of truth—it becomes a signal that the parent can independently verify or safely operate without.
+
+Btw, everything above is deliberately minimal so the reliability ideas stay visible: in-memory state, one machine, no auth. The reference implementation for every stage—a runnable `orchestrator.py` / `subagent.py` pair—lives in the repository alongside this post, with setup and run instructions in the project README.

@@ -55,3 +55,16 @@ a {
     text-decoration-color: #555;
   }
 }
+
+/* Syntax highlighting via rehype-pretty-code (dual light/dark themes) */
+code[data-theme*=" "],
+code[data-theme*=" "] span {
+  color: var(--shiki-light);
+}
+
+@media (prefers-color-scheme: dark) {
+  code[data-theme*=" "],
+  code[data-theme*=" "] span {
+    color: var(--shiki-dark);
+  }
+}
